@@ -1,0 +1,21 @@
+# Secrets / credentials
+.env
+*.env
+
+# Browser profile 
+chrome_profile/
+
+# Virtual environment
+Xvenv/
+
+# Python cache
+*.pyc
+__pycache__/
+.pytest_cache/
+
+# Scraped data
+/Data/*
+!/Data/__init__.py
+
+# Useless data 
+Z-trash/
