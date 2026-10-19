@@ -17,6 +17,9 @@ class Config:
     accept_insecure_certs: bool = conf.ACCEPT_INSECURE_CERTS
     strict_file_interactability: bool = conf.STRICT_FILE_INTERACTABILITY
     login_check_timeout: int = conf.LOGIN_CHECK_TIMEOUT
+    detach: bool = conf.DETACH
+    wait_for_login: bool = conf.WAIT_FOR_LOGIN
+    manual_login_timeout: int = conf.MANUAL_LOGIN_TIMEOUT
 
 
 def build_config(overrides: dict[str, Any]) -> Config:

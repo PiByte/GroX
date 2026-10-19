@@ -1,14 +1,18 @@
 ################ file: helpers.py
-from dataclasses import asdict
 import undetected_chromedriver as uc
+from dataclasses import asdict
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.common.exceptions import (
     TimeoutException,
     StaleElementReferenceException,
 )
 
-from src.locators import XLocators, any_displayed
-
+from src.locators import (
+    XLocators, 
+    any_displayed,
+    any_present,
+    is_on_x
+)
 
 def create_driver(cfg):
     options = uc.ChromeOptions()
@@ -58,22 +62,38 @@ def create_driver(cfg):
     )
     return driver
 
-def detect_login_state(driver, cfg):
+def detect_login_state(driver, cfg, navigate=True):
     """returns: 'logged_in' | 'logged_out' | 'unknown'"""
-    try:
-        driver.get(cfg.x_home_url)
-    except TimeoutException:
-        # The pageLoad timeout fired, but the page may still be usable;
-        # let the wait below decide.
-        pass
+    
+    # never reload the page while the user is trying to log in.
+    if navigate:
+        try:
+            driver.get(cfg.x_home_url)
+        except TimeoutException:
+            # The pageLoad timeout fired, but the page may still be usable;
+            # let the wait below decide.
+            pass
 
     def probe(d):
+        # blank/error page/unexpected redirections: conclude nothing
+        if not is_on_x(d.current_url):
+            return False
+        # No session cookie means we cannot be logged in.
+        if d.get_cookie(XLocators.AUTH_COOKIE) is None:
+            print("check-point 1")
+            return "logged_out", "no auth_token cookie"
+        
+        # If logged-in UI is visible.
         if any_displayed(d, XLocators.LOGGED_IN):
-            return "logged_in"
-        if any(h in d.current_url for h in XLocators.LOGIN_URL_HINTS):
-            return "logged_out"
-        if any_displayed(d, XLocators.LOGGED_OUT):
-            return "logged_out"
+            print("check-point 2")
+            return "logged_in", "cookie and logged-in UI"
+
+        # If logged-out UI is visible.
+        if any_present(d, XLocators.LOGGED_OUT):
+            print("check-point 3")
+            return "logged_out", "cookie but logged-out UI"
+        
+
         return False
 
     wait = WebDriverWait(
@@ -86,7 +106,35 @@ def detect_login_state(driver, cfg):
     try:
         return wait.until(probe, message="login state undetermined")
     except TimeoutException:
-        return "unknown"
+        return "unknown", f"timeout (last url: {driver.current_url})"
+
+def ensure_logged_in(driver, cfg):
+    """Return True once we are logged in; guide the user through a manual login if needed."""
+
+    state, reason = detect_login_state(driver, cfg)
+    print(f"Login state: {state} ({reason})")
+
+    if state == "logged_in":
+        return True
+
+    if state == "unknown":
+        return False  # logging in by hand would not fix e.g. a network problem
+
+    if not cfg.wait_for_login:
+        print("Not logged in. Re-run without --no-wait-login (and without xvfb-run) to log in by hand.")
+        return False
+
+    print(f"Please log in by hand in the browser window (waiting up to {cfg.manual_login_timeout}s)...")
+    wait = WebDriverWait(driver, cfg.manual_login_timeout, poll_frequency=2)
+    try:
+        # navigate=False: never reload the page while the user is trying to log in.
+        wait.until(lambda d: detect_login_state(d, cfg, navigate=False)[0] == "logged_in")
+    except TimeoutException:
+        print("Timed out waiting for the manual login.")
+        return False
+
+    print("Login detected.")
+    return True
 
 def print_config(cfg):
     print("\n╔════════════════════════════════════ CURRENT CONFIG ════════════════════════════════════╗")
