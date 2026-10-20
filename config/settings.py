@@ -17,9 +17,11 @@ class Config:
     accept_insecure_certs: bool = conf.ACCEPT_INSECURE_CERTS
     strict_file_interactability: bool = conf.STRICT_FILE_INTERACTABILITY
     login_check_timeout: int = conf.LOGIN_CHECK_TIMEOUT
+    show_display: bool = conf.SHOW_DISPLAY
     detach: bool = conf.DETACH
     wait_for_login: bool = conf.WAIT_FOR_LOGIN
     manual_login_timeout: int = conf.MANUAL_LOGIN_TIMEOUT
+    window_size: tuple[int, int] = conf.WINDOW_SIZE
 
 
 def build_config(overrides: dict[str, Any]) -> Config:
@@ -28,4 +30,14 @@ def build_config(overrides: dict[str, Any]) -> Config:
     Keys whose value is None are ignored (None means "the user did not pass it").
     """
     changes = {key: value for key, value in overrides.items() if value is not None}
-    return replace(Config(), **changes)
+    cfg = replace(Config(), **changes)
+
+    if not cfg.show_display:
+        # Nobody can interact with an invisible window, and a detached browser
+        # would die together with the virtual display.
+        for key, flag in (("wait_for_login", "--wait-login"), ("detach", "--detach")):
+            if changes.get(key):
+                print(f"Note: {flag} has no effect without --display; ignoring it.")
+        cfg = replace(cfg, wait_for_login=False, detach=False)
+
+    return cfg  

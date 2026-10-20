@@ -3,7 +3,7 @@
 *.env
 
 # Browser profile 
-chrome_profile/
+chrome_profile*/
 
 # Virtual environment
 Xvenv/

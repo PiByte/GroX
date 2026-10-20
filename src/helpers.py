@@ -1,4 +1,3 @@
-################ file: helpers.py
 import undetected_chromedriver as uc
 from dataclasses import asdict
 from selenium.webdriver.support.ui import WebDriverWait
@@ -8,11 +7,12 @@ from selenium.common.exceptions import (
 )
 
 from src.locators import (
-    XLocators, 
+    XLocators,
     any_displayed,
     any_present,
-    is_on_x
+    is_on_x,
 )
+
 
 def create_driver(cfg):
     options = uc.ChromeOptions()
@@ -33,17 +33,20 @@ def create_driver(cfg):
     # options.proxy = Proxy({ 'proxyType': ProxyType.MANUAL, 'httpProxy' : 'http.proxy:1234'})
 
     options.accept_insecure_certs = cfg.accept_insecure_certs
-    options.strict_file_interactability = cfg.strict_file_interactability   
+    options.strict_file_interactability = cfg.strict_file_interactability
     options.timeouts = {
         'pageLoad': 15000,  # Maximum time to wait for a page to load.
         'script': 10000,    # Maximum time to wait for an asynchronous JavaScript script to finish.
         'implicit': 0,      # Must stay 0: we use explicit waits only (mixing both causes unpredictable delays).
     }
 
-    options.add_argument("--start-maximized")
+    width, height = cfg.window_size
+    options.add_argument("--start-maximized")                # real display: fill the screen
+    options.add_argument(f"--window-size={width},{height}")  # virtual display has no window manager, so maximize does nothing there
 
-    # UNSTABLE!
-    # options.add_experimental_option("detach", DETACH)
+    if not cfg.show_display:
+        # Chrome 140+ may pick Wayland by itself and ignore the virtual X11 display.
+        options.add_argument("--ozone-platform=x11")
 
     # Persistent profile so login/cookies survive between runs (no need to log in every time)
     options.add_argument(f"--user-data-dir={cfg.profile_path}")
@@ -62,10 +65,30 @@ def create_driver(cfg):
     )
     return driver
 
-def detect_login_state(driver, cfg, navigate=True):
-    """returns: 'logged_in' | 'logged_out' | 'unknown'"""
+def safe_quit(driver):
+    """Close the browser, ignoring errors if it is already gone (e.g. it also received Ctrl+C)."""
+    try:
+        driver.quit()
+    except Exception:
+        pass
+
+def release_driver(driver):
+    """Leave the browser window open when this program exits (--detach).
+
+    undetected_chromedriver closes the browser in Chrome.__del__ (it calls self.quit()),
+    so merely not calling driver.quit() is not enough. Replacing quit() on this instance
+    turns that call into a no-op. __del__ still stops chromedriver, which Chrome does not need.
+    """
+    driver.quit = lambda: None
     
-    # never reload the page while the user is trying to log in.
+def raise_interrupt(signum, frame):
+    """Turn SIGTERM (kill, systemd stop) into KeyboardInterrupt so the cleanup below runs."""
+    raise KeyboardInterrupt
+
+def detect_login_state(driver, cfg, navigate=True):
+    """Return (state, reason). state: 'logged_in' | 'logged_out' | 'unknown'."""
+
+    # navigate=False: never reload the page while the user is trying to log in.
     if navigate:
         try:
             driver.get(cfg.x_home_url)
@@ -75,24 +98,21 @@ def detect_login_state(driver, cfg, navigate=True):
             pass
 
     def probe(d):
-        # blank/error page/unexpected redirections: conclude nothing
+        # Blank/error page or unexpected redirect: conclude nothing.
         if not is_on_x(d.current_url):
             return False
+
         # No session cookie means we cannot be logged in.
         if d.get_cookie(XLocators.AUTH_COOKIE) is None:
-            print("check-point 1")
             return "logged_out", "no auth_token cookie"
-        
-        # If logged-in UI is visible.
+
+        # Logged-in UI is visible.
         if any_displayed(d, XLocators.LOGGED_IN):
-            print("check-point 2")
             return "logged_in", "cookie and logged-in UI"
 
-        # If logged-out UI is visible.
+        # Logged-out UI is present.
         if any_present(d, XLocators.LOGGED_OUT):
-            print("check-point 3")
             return "logged_out", "cookie but logged-out UI"
-        
 
         return False
 
@@ -100,7 +120,7 @@ def detect_login_state(driver, cfg, navigate=True):
         driver=driver,
         timeout=cfg.login_check_timeout,
         poll_frequency=0.5,
-        ignored_exceptions=[StaleElementReferenceException]
+        ignored_exceptions=[StaleElementReferenceException],
     )
 
     try:
@@ -121,7 +141,10 @@ def ensure_logged_in(driver, cfg):
         return False  # logging in by hand would not fix e.g. a network problem
 
     if not cfg.wait_for_login:
-        print("Not logged in. Re-run without --no-wait-login (and without xvfb-run) to log in by hand.")
+        if cfg.show_display:
+            print("Not logged in (--no-wait-login is set).")
+        else:
+            print("Not logged in. Log in once by hand with: ./GroX.sh --display --wait-login")
         return False
 
     print(f"Please log in by hand in the browser window (waiting up to {cfg.manual_login_timeout}s)...")
@@ -141,6 +164,7 @@ def print_config(cfg):
     for key, value in asdict(cfg).items():
         print(f"║ {key:<30} : {value}")
     print("╚════════════════════════════════════════════════════════════════════════════════════════╝\n")
+
 
 # -------- 0. EXTRACT GENERAL DATA --------
 # def extract_profile_stats(driver, username):
