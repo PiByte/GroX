@@ -144,7 +144,7 @@ def ensure_logged_in(driver, cfg):
         if cfg.show_display:
             print("Not logged in (--no-wait-login is set).")
         else:
-            print("Not logged in. Log in once by hand with: ./GroX.sh --display --wait-login")
+            print("Not logged in. Log in once by hand with: ./GroX.bash --display --wait-login")
         return False
 
     print(f"Please log in by hand in the browser window (waiting up to {cfg.manual_login_timeout}s)...")

@@ -2,7 +2,7 @@ import argparse
 
 
 def build_parser():
-    parser = argparse.ArgumentParser(prog="./GroX.sh", description="grox")
+    parser = argparse.ArgumentParser(prog="./GroX.bash", description="Grow your X account.")
 
     # Rules: default=None (so we can tell "not passed" from "passed"),
     # and dest must match a field name of Config.

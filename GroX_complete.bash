@@ -6,10 +6,10 @@ _grox_complete() {
 
     case "$prev" in
         --page-load) COMPREPLY=( $(compgen -W "normal eager" -- "$cur") ); return ;;
-        --login-timeout|--username) return ;;   # free-form value: nothing to suggest
+        --username) return ;;   # free-form value: nothing to suggest
     esac
 
-    COMPREPLY=( $(compgen -W "-h --help --display --page-load --login-timeout --username --insecure-certs --no-insecure-certs --wait-login --no-wait-login --detach --no-detach" -- "$cur") )
+    COMPREPLY=( $(compgen -W "-h --help --display --page-load --username --insecure-certs --no-insecure-certs --wait-login --no-wait-login --detach --no-detach" -- "$cur") )
 }
 
-complete -F _grox_complete GroX.sh
+complete -F _grox_complete GroX.bash

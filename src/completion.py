@@ -1,11 +1,11 @@
 """Generate the bash completion script from the argparse parser, so options are never listed twice.
 
 Regenerate after changing src/parser.py (from the project root):
-    Xvenv/bin/python -m src.completion > completions/grox.bash
+    Xvenv/bin/python -m src.completion > GroX_complete.bash
 """
 from src.parser import build_parser
 
-PROG = "GroX.sh"   # the command the completion is registered for
+PROG = "GroX.bash"   # the command the completion is registered for
 
 
 def generate():
