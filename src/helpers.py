@@ -1,5 +1,7 @@
+from typing import Any
+from collections.abc import Mapping
 import undetected_chromedriver as uc
-from dataclasses import asdict
+from dataclasses import asdict, is_dataclass
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.common.exceptions import (
     TimeoutException,
@@ -35,9 +37,9 @@ def create_driver(cfg):
     options.accept_insecure_certs = cfg.accept_insecure_certs
     options.strict_file_interactability = cfg.strict_file_interactability
     options.timeouts = {
-        'pageLoad': 15000,  # Maximum time to wait for a page to load.
-        'script': 10000,    # Maximum time to wait for an asynchronous JavaScript script to finish.
-        'implicit': 0,      # Must stay 0: we use explicit waits only (mixing both causes unpredictable delays).
+    'pageLoad': cfg.timeout_long * 1000,    # Maximum time to wait for a page to load. W3C timeouts are milliseconds, config values are seconds.
+    'script': cfg.timeout_medium * 1000,    # Maximum time to wait for an asynchronous JavaScript script to finish.
+    'implicit': 0,                          # Must stay 0: we use explicit waits only (mixing both causes unpredictable delays).
     }
 
     width, height = cfg.window_size
@@ -118,7 +120,7 @@ def detect_login_state(driver, cfg, navigate=True):
 
     wait = WebDriverWait(
         driver=driver,
-        timeout=cfg.login_check_timeout,
+        timeout=cfg.timeout_long,
         poll_frequency=0.5,
         ignored_exceptions=[StaleElementReferenceException],
     )
@@ -159,116 +161,26 @@ def ensure_logged_in(driver, cfg):
     print("Login detected.")
     return True
 
-def print_config(cfg):
-    print("\n╔════════════════════════════════════ CURRENT CONFIG ════════════════════════════════════╗")
-    for key, value in asdict(cfg).items():
-        print(f"║ {key:<30} : {value}")
-    print("╚════════════════════════════════════════════════════════════════════════════════════════╝\n")
+def print_box(data: Any, title: str | None = None) -> None:
+    """Print a dict or a dataclass instance as a titled box.
 
+    Raises TypeError for anything else.
+    """
 
-# -------- 0. EXTRACT GENERAL DATA --------
-# def extract_profile_stats(driver, username):
-#     """
-#     Extract profile-level stats that X already displays on the profile page
-#     (post count, following count, followers count) - pure reading of what's
-#     shown, no computation.
-#     """
+    BOX_WIDTH = 77
 
-#     driver.get(f"https://x.com/{username}")
+    if is_dataclass(data) and not isinstance(data, type):
+        data = asdict(data)
+    elif not isinstance(data, Mapping):
+        raise TypeError(
+            f"Cannot print {type(data).__name__}: expected a dict or a dataclass instance"
+        )
 
-#     stats = {"posts": None, "following": None, "followers": None}
-
-#     # Posts count usually appears near the top as "<number> posts"
-#     try:
-#         posts_el = driver.find_element(By.XPATH, '//span[contains(text(), "posts")]')
-#         stats["posts"] = posts_el.text
-#     except Exception:
-#         pass
-
-#     # Following count link: href ends with /following
-#     try:
-#         following_el = driver.find_element(By.XPATH, f'//a[@href="/{username}/following"]')
-#         stats["following"] = following_el.text
-#     except Exception:
-#         pass
-
-#     # Followers count link: href ends with /followers or /verified_followers
-#     try:
-#         followers_el = driver.find_element(By.XPATH, f'//a[@href="/{username}/followers"]')
-#         stats["followers"] = followers_el.text
-#     except Exception:
-#         try:
-#             followers_el = driver.find_element(By.XPATH, f'//a[@href="/{username}/verified_followers"]')
-#             stats["followers"] = followers_el.text
-#         except Exception:
-#             pass
-
-#     print("\n=== Profile Stats (as shown by X) ===")
-#     print(f"Posts:     {stats['posts']}")
-#     print(f"Following: {stats['following']}")
-#     print(f"Followers: {stats['followers']}")
-#     print("======================================\n")
-
-#     return stats
-
-# def extract_about_this_account(driver, username):
-#     """
-#     Navigates directly to x.com/<username>/about, which is the same panel
-#     normally triggered by hovering "Joined <date>" on the profile - avoids
-#     simulating an unreliable hover interaction in Selenium. Pure text
-#     extraction of what's already displayed, no computation.
-#     """
-#     about_data = {
-#         "joined": None,
-#         "account_based_in": None,
-#         "username_changes": None,
-#         "last_username_change": None,
-#         "connected_via": None,
-#         "raw_lines": [],
-#     }
-
-#     try:
-#         driver.get(f"https://x.com/{username}/about")
-#         time.sleep(2)
-
-#         # Content might render as a dialog overlay OR as a plain section on
-#         # the page depending on how X serves this URL - try dialog first,
-#         # fall back to the main content area.
-#         container = None
-#         try:
-#             container = WebDriverWait(driver, 4).until(
-#                 EC.presence_of_element_located((By.CSS_SELECTOR, '[role="dialog"]'))
-#             )
-#         except TimeoutException:
-#             container = driver.find_element(By.CSS_SELECTOR, '[data-testid="primaryColumn"]')
-
-#         lines = [l.strip() for l in container.text.split("\n") if l.strip()]
-#         about_data["raw_lines"] = lines
-
-#         for i, line in enumerate(lines):
-#             if line.lower().startswith("joined"):
-#                 about_data["joined"] = line.replace("Joined", "").strip()
-
-#             elif "account based in" in line.lower():
-#                 about_data["account_based_in"] = line.split(" in ", 1)[-1].strip()
-
-#             elif re.search(r"\d+ username changes?", line, re.IGNORECASE):
-#                 about_data["username_changes"] = line.strip()
-#                 if i + 1 < len(lines) and lines[i + 1].lower().startswith("last on"):
-#                     about_data["last_username_change"] = lines[i + 1].replace("Last on", "").strip()
-
-#             elif line.lower().startswith("connected via"):
-#                 about_data["connected_via"] = line.replace("Connected via", "").strip()
-
-#     except Exception as e:
-#         print(f"Could not extract 'About this account' info: {e}")
-
-#     print("\n=== About This Account ===")
-#     print(f"Joined:                {about_data['joined']}")
-#     print(f"Account based in:      {about_data['account_based_in']}")
-#     print(f"Username changes:      {about_data['username_changes']}")
-#     print(f"Last username change:  {about_data['last_username_change']}")
-#     print(f"Connected via:         {about_data['connected_via']}")
-#     print("===========================\n")
-
-#     return about_data
+    if title is None:
+        header = f"".center(BOX_WIDTH, "═")
+    else:
+        header = f" {title} ".ljust(BOX_WIDTH, "═")
+    print(f"\n╔══{header}")
+    for key, value in data.items():
+        print(f"║ {str(key):<30} : {value}")
+    print(f"╚══{'═' * BOX_WIDTH}\n")
