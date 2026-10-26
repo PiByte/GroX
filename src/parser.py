@@ -19,11 +19,6 @@ def build_parser():
         help="normal: wait for full load | eager: return at DOMContentLoaded (faster)",
     )
     parser.add_argument(
-        "--login-timeout", dest="login_check_timeout",
-        type=int, default=None,
-        help="seconds to wait when detecting the login state",
-    )
-    parser.add_argument(
         "--username", dest="x_username", default=None,
         help="X username to use for this run",
     )
