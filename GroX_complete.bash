@@ -9,7 +9,7 @@ _grox_complete() {
         --username) return ;;   # free-form value: nothing to suggest
     esac
 
-    COMPREPLY=( $(compgen -W "-h --help --display --page-load --username --insecure-certs --no-insecure-certs --wait-login --no-wait-login --detach --no-detach" -- "$cur") )
+    COMPREPLY=( $(compgen -W "-h --help --version --display --page-load --username --insecure-certs --no-insecure-certs --wait-login --no-wait-login --detach --no-detach" -- "$cur") )
 }
 
 complete -F _grox_complete GroX.bash

@@ -1,5 +1,7 @@
 import argparse
 
+from src import __version__
+
 
 def build_parser():
     parser = argparse.ArgumentParser(prog="./GroX.bash", description="Grow your X account.")
@@ -7,6 +9,8 @@ def build_parser():
     # Rules: default=None (so we can tell "not passed" from "passed"),
     # and dest must match a field name of Config.
 
+    parser.add_argument("--version", action="version", version=f"GroX {__version__}")
+    
     parser.add_argument(
         "--display", dest="show_display",
         action="store_true", default=None,
