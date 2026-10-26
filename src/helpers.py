@@ -134,7 +134,7 @@ def ensure_logged_in(driver, cfg):
     """Return True once we are logged in; guide the user through a manual login if needed."""
 
     state, reason = detect_login_state(driver, cfg)
-    print(f"Login state: {state} ({reason})")
+    print_box({"state": state, "reason": reason}, "Login State")
 
     if state == "logged_in":
         return True

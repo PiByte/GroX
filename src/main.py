@@ -1,10 +1,10 @@
 import sys
 import signal
-
 from src.parser import parse_args
 from config.settings import build_config
+from src.data_extractors.general_info import extract_info
 from src.helpers import (
-    print_config,
+    print_box,
     create_driver,
     ensure_logged_in,
     release_driver,
@@ -15,14 +15,22 @@ from src.helpers import (
 
 def main():
     cfg = build_config(vars(parse_args()))   # defaults + this run's overrides
-    print_config(cfg)
+    print_box(cfg, "Current Config")
 
     signal.signal(signal.SIGTERM, raise_interrupt)
 
     driver = create_driver(cfg)
+    
     try:
         if not ensure_logged_in(driver, cfg):
             return 1
+        
+        info = extract_info(driver, cfg.x_username)
+        print_box(info, "General Info")
+        
+        if "error" in info:
+            return 2
+ 
         return 0
     finally:
         if cfg.detach:
