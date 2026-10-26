@@ -88,7 +88,7 @@ def download_profile_media(driver, username):
     """
 
     result, missing = {}, {}
-    folder = DATA_DIR / username
+    folder = DATA_DIR / username.lower()
 
     jobs = {
         "avatar": (ProfileLocators.avatar_img(username), _avatar_full_size),
